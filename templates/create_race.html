@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Create New Race</title>
+</head>
+<body>
+
+<h1>Create a New Race</h1>
+
+<form method="POST" action="/create">
+    <label>Race Name:</label>
+    <input type="text" name="name" required><br><br>
+
+    <label>Horse Names (comma separated):</label><br>
+    <textarea name="horses" rows="5" cols="40" required></textarea><br><br>
+
+    <button type="submit">Create Race</button>
+</form>
+
+<p><a href="/">Back to Races</a></p>
+
+</body>
+</html>

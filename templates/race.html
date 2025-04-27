@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Race</title>
+    <script>
+        setTimeout(() => {
+            window.location.reload();
+        }, 5000);
+    </script>
+</head>
+<body>
+<h1>Race Betting</h1>
+
+<form method="POST" action="/bet">
+    <input type="hidden" name="race_id" value="{{.RaceID}}">
+
+    <label>Your Name:</label>
+    <input type="text" name="name" required><br><br>
+
+    <table border="1" cellpadding="10">
+        <thead>
+            <tr>
+                <th>Horse</th>
+                <th>Money Bet</th>
+                <th>Odds</th>
+                <th>Your Bet</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Horses}}
+            <tr>
+                <td>{{.Name}}</td>
+                <td>${{printf "%.2f" .Amount}}</td>
+                <td>{{if gt .Odds 0.0}}{{printf "%.2f" .Odds}}x{{else}}N/A{{end}}</td>
+                <td>
+                    <input type="number" step="0.01" name="amount_{{.ID}}" min="0">
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+
+    <br>
+    <button type="submit">Place Bets</button>
+</form>
+
+<p><a href="/">Back to Races</a></p>
+
+</body>
+</html>
