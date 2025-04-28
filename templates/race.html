@@ -40,7 +40,7 @@
           <tr>
             <td><a href="/horse/{{.ID}}">{{.Name}}</a></td>
             <td>${{printf "%.2f" .Amount}}</td>
-            <td>{{if gt .Odds 0.0}}{{printf "%.2f" .Odds}}x{{else}}N/A{{end}}</td>
+            <td>{{.FractionalOdds}}</td>
             <td><input type="number" class="form-control" step="0.01" name="amount_{{.ID}}" min="0"></td>
           </tr>
           {{end}}

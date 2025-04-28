@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: horsebets-ingress
+  namespace: horsebets
+spec:
+  rules:
+  - host: horsebets.northbriton.net
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: horsebets
+            port:
+              number: 80

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: "2025-04-12T18:22:23Z"
+  labels:
+    app: horsebets
+  name: horsebets
+  namespace: horsebets
+  resourceVersion: "205401242"
+  uid: ee60934e-944a-4208-a99e-4cd3518d2384
+spec:
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: horsebets
+  sessionAffinity: None
+  type: ClusterIP

@@ -41,7 +41,8 @@ type Bet struct {
 // Data structure for odds calculation
 type HorseWithOdds struct {
 	Horse
-	Odds float64
+	Odds           float64
+	FractionalOdds string
 }
 
 // Add payout struct for template
@@ -115,9 +116,11 @@ func handleRace(w http.ResponseWriter, r *http.Request) {
 		if h.Amount > 0 {
 			odds = total / h.Amount
 		}
+		profit := odds - 1
 		horsesWithOdds = append(horsesWithOdds, HorseWithOdds{
-			Horse: h,
-			Odds:  odds,
+			Horse:          h,
+			Odds:           odds,
+			FractionalOdds: computeFractionalOdds(profit),
 		})
 	}
 
@@ -130,7 +133,6 @@ func handleRace(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Place one or more bets
 func handleBet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
