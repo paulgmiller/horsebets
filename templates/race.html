@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>Race</title>
+    <!--reloading resets bet feilds so find a better way later.
     <script>
         setTimeout(() => {
             window.location.reload();
         }, 5000);
     </script>
+    --> 
 </head>
 <body>
 <h1>Race Betting</h1>
@@ -30,7 +32,7 @@
         <tbody>
             {{range .Horses}}
             <tr>
-                <td>{{.Name}}</td>
+                <td><a href="/horse/{{.ID}}">{{.Name}}</a></td>
                 <td>${{printf "%.2f" .Amount}}</td>
                 <td>{{if gt .Odds 0.0}}{{printf "%.2f" .Odds}}x{{else}}N/A{{end}}</td>
                 <td>

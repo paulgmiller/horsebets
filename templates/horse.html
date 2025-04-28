@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bets for {{.Horse.Name}}</title>
+</head>
+<body>
+    <h1>Bets for {{.Horse.Name}}</h1>
+    <p>Total Race Pot: ${{printf "%.2f" .RaceTotal}}</p>
+    <p>Total on this Horse: ${{printf "%.2f" .HorseTotal}}</p>
+
+    <table border="1" cellpadding="10">
+        <thead>
+            <tr>
+                <th>Bettor</th>
+                <th>Bet Amount</th>
+                <th>Winnings</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Bets}}
+            <tr>
+                <td>{{.Name}}</td>
+                <td>${{printf "%.2f" .Amount}}</td>
+                <td>${{printf "%.2f" .Winnings}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+
+    <p><a href="/race/{{.Horse.RaceID}}">Back to Race</a></p>
+    <p><a href="/">Home</a></p>
+</body>
+</html>

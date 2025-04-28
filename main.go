@@ -44,11 +44,19 @@ type HorseWithOdds struct {
 	Odds float64
 }
 
+// Add payout struct for template
+type BetWithPayout struct {
+	Name     string
+	Amount   float64
+	Winnings float64
+}
+
 // Templates
 var (
 	indexTemplate      = template.Must(template.ParseFiles("templates/index.html"))
 	raceTemplate       = template.Must(template.ParseFiles("templates/race.html"))
 	createRaceTemplate = template.Must(template.ParseFiles("templates/create_race.html"))
+	horseTemplate      = template.Must(template.ParseFiles("templates/horse.html"))
 )
 
 func main() {
@@ -69,6 +77,7 @@ func main() {
 	http.HandleFunc("/race/", handleRace)
 	http.HandleFunc("/bet", handleBet)
 	http.HandleFunc("/create", handleCreateRace)
+	http.HandleFunc("/horse/", handleHorse)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
 	log.Println("Server started at http://localhost:8080")
@@ -209,4 +218,50 @@ func handleCreateRace(w http.ResponseWriter, r *http.Request) {
 
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
+}
+
+// handleHorse shows bets for a specific horse and calculates equal share of pot
+func handleHorse(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/horse/")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid horse ID", http.StatusBadRequest)
+		return
+	}
+	var horse Horse
+	if err := db.First(&horse, id).Error; err != nil {
+		http.Error(w, "Horse not found", http.StatusNotFound)
+		return
+	}
+	// Load bets for this horse
+	var bets []Bet
+	db.Where("horse_id = ?", id).Find(&bets)
+	// Calculate race total pot
+	var raceHorses []Horse
+	db.Where("race_id = ?", horse.RaceID).Find(&raceHorses)
+	var raceTotal float64
+	for _, h := range raceHorses {
+		raceTotal += h.Amount
+	}
+	// Compute payouts per bet
+	var betPayouts []BetWithPayout
+	for _, b := range bets {
+		var ratio float64
+		if horse.Amount > 0 {
+			ratio = b.Amount / horse.Amount
+		}
+		payout := ratio * raceTotal
+		betPayouts = append(betPayouts, BetWithPayout{
+			Name:     b.Name,
+			Amount:   b.Amount,
+			Winnings: payout,
+		})
+	}
+	// Render template with race and horse pots and payouts
+	horseTemplate.Execute(w, struct {
+		Horse      Horse
+		Bets       []BetWithPayout
+		RaceTotal  float64
+		HorseTotal float64
+	}{Horse: horse, Bets: betPayouts, RaceTotal: raceTotal, HorseTotal: horse.Amount})
 }
