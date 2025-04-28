@@ -2,33 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <title>Bets for {{.Horse.Name}}</title>
 </head>
 <body>
-    <h1>Bets for {{.Horse.Name}}</h1>
-    <p>Total Race Pot: ${{printf "%.2f" .RaceTotal}}</p>
-    <p>Total on this Horse: ${{printf "%.2f" .HorseTotal}}</p>
-
-    <table border="1" cellpadding="10">
-        <thead>
+    <div class="container py-4">
+      <h1 class="mb-4">Bets for {{.Horse.Name}}</h1>
+      <p class="mb-1">Total Race Pot: <strong>${{printf "%.2f" .RaceTotal}}</strong></p>
+      <p class="mb-3">Total on this Horse: <strong>${{printf "%.2f" .HorseTotal}}</strong></p>
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead>
             <tr>
-                <th>Bettor</th>
-                <th>Bet Amount</th>
-                <th>Winnings</th>
+              <th>Bettor</th>
+              <th>Bet Amount</th>
+              <th>Winnings</th>
             </tr>
-        </thead>
-        <tbody>
-            {{range .Bets}}
+          </thead>
+          <tbody>
+             {{range .Bets}}
             <tr>
-                <td>{{.Name}}</td>
-                <td>${{printf "%.2f" .Amount}}</td>
-                <td>${{printf "%.2f" .Winnings}}</td>
+              <td>{{.Name}}</td>
+              <td>${{printf "%.2f" .Amount}}</td>
+              <td>${{printf "%.2f" .Winnings}}</td>
             </tr>
-            {{end}}
-        </tbody>
-    </table>
+             {{end}}
+          </tbody>
+        </table>
+      </div>
 
-    <p><a href="/race/{{.Horse.RaceID}}">Back to Race</a></p>
-    <p><a href="/">Home</a></p>
+      <div class="mt-4">
+        <a href="/race/{{.Horse.RaceID}}" class="btn btn-primary me-2">Back to Race</a>
+        <a href="/" class="btn btn-secondary">Home</a>
+      </div>
+      <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </div>
 </body>
 </html>
