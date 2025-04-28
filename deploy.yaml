@@ -32,3 +32,9 @@ spec:
       - image: paulgmiller/horsebets:7468880
         name: horsebets
         resources: {}
+        env:
+        - name: MSSQL_DSN
+          valueFrom:
+            secretKeyRef:
+              key: MSSQL_DSN
+              name: horsebets
