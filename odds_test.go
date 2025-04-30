@@ -19,22 +19,23 @@ func TestGCD(t *testing.T) {
 
 func TestComputeFractionalOdds(t *testing.T) {
 	for _, tc := range []struct {
-		profit float64
-		want   string
+		total int
+		stake int
+		want  string
 	}{
-		{-1.0, "N/A"},
-		{0.0, "N/A"},
-		{0.8, "4:5"},
-		{0.1, "1:10"},
-		{2.0, "2:1"},
-		{1.0, "1:1"},
-		{1.25, "5:4"},
-		{7.12, "7:1"},
-		{0.123, "100:813"},
+		{0, 0, "No Bets"},
+		{100, 0, "No Bets"},
+		{8, 10, "4:5"},
+		{10, 100, "1:10"},
+		{8, 4, "2:1"},
+		{50, 50, "1:1"},
+		{25, 20, "5:4"},
+		{7, 1, "7:1"},
+		{100, 813, "100:813"},
 	} {
-		got := computeFractionalOdds(tc.profit)
+		got := computeFractionalOdds(tc.total, tc.stake)
 		if got != tc.want {
-			t.Errorf("computeFractionalOdds(%.3f) = %q; want %q", tc.profit, got, tc.want)
+			t.Errorf("computeFractionalOdds(%d, %d) = %q; want %q", tc.total, tc.stake, got, tc.want)
 		}
 	}
 }

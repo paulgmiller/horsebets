@@ -143,11 +143,10 @@ func handleRace(w http.ResponseWriter, r *http.Request) {
 		if h.Amount > 0 {
 			odds = total / h.Amount
 		}
-		profit := odds - 1
 		horsesWithOdds = append(horsesWithOdds, HorseWithOdds{
 			Horse:          h,
 			Odds:           odds,
-			FractionalOdds: computeFractionalOdds(profit),
+			FractionalOdds: computeFractionalOdds(int(total), int(h.Amount)),
 		})
 	}
 
