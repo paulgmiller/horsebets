@@ -21,6 +21,7 @@ type Race struct {
 	ID        uint `gorm:"primaryKey"`
 	Name      string
 	CreatedAt time.Time
+	Locked    bool // lock betting when true
 	Horses    []Horse
 }
 
@@ -87,7 +88,13 @@ func main() {
 
 	// Routes
 	http.HandleFunc("/", handleHome)
-	http.HandleFunc("/race/", handleRace)
+	http.HandleFunc("/race/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/stop") {
+			handleStopRace(w, r)
+		} else {
+			handleRace(w, r)
+		}
+	})
 	http.HandleFunc("/bet", handleBet)
 	http.HandleFunc("/create", handleCreateRace)
 	http.HandleFunc("/horse/", handleHorse)
@@ -114,6 +121,14 @@ func handleRace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Load race to get locked state
+	var race Race
+	if err := db.First(&race, raceID).Error; err != nil {
+		http.Error(w, "Race not found", http.StatusNotFound)
+		return
+	}
+	locked := race.Locked
+
 	var horses []Horse
 	db.Where("race_id = ?", raceID).Find(&horses)
 
@@ -139,9 +154,11 @@ func handleRace(w http.ResponseWriter, r *http.Request) {
 	raceTemplate.Execute(w, struct {
 		RaceID int
 		Horses []HorseWithOdds
+		Locked bool
 	}{
 		RaceID: raceID,
 		Horses: horsesWithOdds,
+		Locked: locked,
 	})
 }
 
@@ -162,6 +179,17 @@ func handleBet(w http.ResponseWriter, r *http.Request) {
 	raceID, err := strconv.Atoi(raceIDStr)
 	if err != nil {
 		http.Error(w, "Invalid race ID", 400)
+		return
+	}
+
+	// Check if betting is closed for this race
+	var race Race
+	if err := db.First(&race, raceID).Error; err != nil {
+		http.Error(w, "Race not found", http.StatusNotFound)
+		return
+	}
+	if race.Locked {
+		http.Error(w, "Betting closed for this race", http.StatusForbidden)
 		return
 	}
 
@@ -278,4 +306,16 @@ func handleHorse(w http.ResponseWriter, r *http.Request) {
 		RaceTotal  float64
 		HorseTotal float64
 	}{Horse: horse, Bets: betPayouts, RaceTotal: raceTotal, HorseTotal: horse.Amount})
+}
+
+// handleStopRace locks betting on a race
+func handleStopRace(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/race/"), "/stop")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid race ID", http.StatusBadRequest)
+		return
+	}
+	db.Model(&Race{}).Where("id = ?", id).Update("Locked", true)
+	http.Redirect(w, r, "/race/"+idStr, http.StatusSeeOther)
 }
