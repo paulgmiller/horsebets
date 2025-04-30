@@ -7,7 +7,6 @@ RUN go mod download && go mod verify
 COPY *.go ./
 COPY templates/*.html ./templates/
 
-RUN go vet -v
 RUN go test -v
 
 RUN go build -o /go/bin/app

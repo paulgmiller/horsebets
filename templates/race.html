@@ -48,9 +48,7 @@
             <td><a href="/horse/{{.ID}}">{{.Name}}</a></td>
             <td>${{printf "%.2f" .Amount}}</td>
             <td>{{.FractionalOdds}}</td>
-            {{if not .Locked}}
             <td><input type="number" class="form-control" step="0.01" name="amount_{{.ID}}" min="0"></td>
-            {{end}}
           </tr>
           {{end}}
         </tbody>
