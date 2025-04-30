@@ -1,16 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    deployment.kubernetes.io/revision: "1"
-  creationTimestamp: "2025-04-28T01:03:47Z"
-  generation: 1
   labels:
     app: horsebets
   name: horsebets
   namespace: horsebets
-  resourceVersion: "212009403"
-  uid: 878e9972-4197-46bf-af82-be644fef818f
 spec:
   progressDeadlineSeconds: 600
   replicas: 1
@@ -20,7 +14,7 @@ spec:
       app: horsebets
   strategy:
     rollingUpdate:
-      maxUnavailable: 25%
+      maxSurge: 25%
     type: RollingUpdate
   template:
     metadata:
@@ -29,7 +23,7 @@ spec:
         app: horsebets
     spec:
       containers:
-      - image: paulgmiller/horsebets:7468880
+      - image: paulgmiller/horsebets:99f00a4
         name: horsebets
         resources: {}
         env:
