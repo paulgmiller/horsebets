@@ -146,7 +146,7 @@ func handleRace(w http.ResponseWriter, r *http.Request) {
 		horsesWithOdds = append(horsesWithOdds, HorseWithOdds{
 			Horse:          h,
 			Odds:           odds,
-			FractionalOdds: computeFractionalOdds(int(total), int(h.Amount)),
+			FractionalOdds: computeFractionalOdds(total, h.Amount),
 		})
 	}
 
