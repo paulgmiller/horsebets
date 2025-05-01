@@ -17,9 +17,10 @@
 <div class="container py-4">
   <h1 class="mb-4">Race Betting</h1>
   {{if not .Locked}}
+  <!-- too powerful for mortals
   <form method="POST" action="/race/{{.RaceID}}/stop" class="mb-3">
     <button type="submit" class="btn btn-danger">Stop Betting</button>
-  </form>
+  </form>-->
   {{end}}
   {{if .Locked}}
     <div class="alert alert-warning">Betting for this race is now closed.</div>
