@@ -23,7 +23,7 @@ spec:
         app: horsebets
     spec:
       containers:
-      - image: paulgmiller/horsebets:99f00a4
+      - image: paulgmiller/horsebets:16a93c4
         name: horsebets
         resources: {}
         env:
