@@ -61,6 +61,7 @@ var (
 	raceTemplate       = template.Must(template.ParseFiles("templates/race.html"))
 	createRaceTemplate = template.Must(template.ParseFiles("templates/create_race.html"))
 	horseTemplate      = template.Must(template.ParseFiles("templates/horse.html"))
+	bettorTemplate     = template.Must(template.ParseFiles("templates/bettor.html"))
 )
 
 func main() {
@@ -98,6 +99,7 @@ func main() {
 	http.HandleFunc("/bet", handleBet)
 	http.HandleFunc("/create", handleCreateRace)
 	http.HandleFunc("/horse/", handleHorse)
+	http.HandleFunc("/bettor/", handleBettor)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
 	log.Println("Server started at http://localhost:8080")
@@ -150,14 +152,23 @@ func handleRace(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	var bettors []string
+	db.Model(&Bet{}).
+		Joins("join horses on bets.horse_id = horses.id").
+		Where("horses.race_id = ?", raceID).
+		Distinct("bets.name").
+		Pluck("bets.name", &bettors)
+
 	raceTemplate.Execute(w, struct {
-		RaceID int
-		Horses []HorseWithOdds
-		Locked bool
+		RaceID  int
+		Horses  []HorseWithOdds
+		Locked  bool
+		Bettors []string
 	}{
-		RaceID: raceID,
-		Horses: horsesWithOdds,
-		Locked: locked,
+		RaceID:  raceID,
+		Horses:  horsesWithOdds,
+		Locked:  locked,
+		Bettors: bettors,
 	})
 }
 
@@ -317,4 +328,54 @@ func handleStopRace(w http.ResponseWriter, r *http.Request) {
 	}
 	db.Model(&Race{}).Where("id = ?", id).Update("Locked", true)
 	http.Redirect(w, r, "/race/"+idStr, http.StatusSeeOther)
+}
+
+// handleBettor shows all bets by a specific bettor for a given race
+func handleBettor(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/bettor/")
+	parts := strings.SplitN(path, "/", 2)
+	if len(parts) != 2 {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+	raceID, err := strconv.Atoi(parts[0])
+	name := parts[1]
+	if err != nil {
+		http.Error(w, "Invalid race ID", http.StatusBadRequest)
+		return
+	}
+	var horses []Horse
+	db.Where("race_id = ?", raceID).Find(&horses)
+	horseMap := make(map[uint]string)
+	var horseIDs []uint
+	for _, h := range horses {
+		horseIDs = append(horseIDs, h.ID)
+		horseMap[h.ID] = h.Name
+	}
+	var bets []Bet
+	db.Where("horse_id IN ?", horseIDs).
+		Where("name = ?", name).
+		Find(&bets)
+	type BettorBet struct {
+		HorseID   uint
+		HorseName string
+		Amount    float64
+	}
+	var bettorBets []BettorBet
+	for _, b := range bets {
+		bettorBets = append(bettorBets, BettorBet{
+			HorseID:   b.HorseID,
+			HorseName: horseMap[b.HorseID],
+			Amount:    b.Amount,
+		})
+	}
+	bettorTemplate.Execute(w, struct {
+		RaceID int
+		Name   string
+		Bets   []BettorBet
+	}{
+		RaceID: raceID,
+		Name:   name,
+		Bets:   bettorBets,
+	})
 }
