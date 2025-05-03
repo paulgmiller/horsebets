@@ -101,6 +101,7 @@ func main() {
 	http.HandleFunc("/create", handleCreateRace)
 	http.HandleFunc("/horse/", handleHorse)
 	http.HandleFunc("/bettor/", handleBettor)
+	http.HandleFunc("/healthz", handleHealthz)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
 	log.Println("Server started at http://localhost:8080")
@@ -385,4 +386,19 @@ func handleBettor(w http.ResponseWriter, r *http.Request) {
 		Name:   name,
 		Bets:   bettorBets,
 	})
+}
+
+// handleHealthz checks database connectivity and liveness/readiness
+func handleHealthz(w http.ResponseWriter, r *http.Request) {
+	sqlDB, err := db.DB()
+	if err != nil {
+		http.Error(w, "Database connection error", http.StatusInternalServerError)
+		return
+	}
+	if err := sqlDB.Ping(); err != nil {
+		http.Error(w, "Database ping failed", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
 }

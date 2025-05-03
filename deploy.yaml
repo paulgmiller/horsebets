@@ -23,7 +23,7 @@ spec:
         app: horsebets
     spec:
       containers:
-      - image: paulgmiller/horsebets:85fcca9
+      - image: paulgmiller/horsebets:790cd19
         name: horsebets
         resources: {}
         env:
@@ -32,3 +32,17 @@ spec:
             secretKeyRef:
               key: MSSQL_DSN
               name: horsebets
+        ports:
+        - containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
