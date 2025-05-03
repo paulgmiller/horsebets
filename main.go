@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -159,17 +160,23 @@ func handleRace(w http.ResponseWriter, r *http.Request) {
 		Distinct("bets.name").
 		Pluck("bets.name", &bettors)
 
-	raceTemplate.Execute(w, struct {
+	err = raceTemplate.Execute(w, struct {
+		Name    string
 		RaceID  int
 		Horses  []HorseWithOdds
 		Locked  bool
 		Bettors []string
 	}{
+		Name:    race.Name,
 		RaceID:  raceID,
 		Horses:  horsesWithOdds,
 		Locked:  locked,
 		Bettors: bettors,
 	})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error rendering template %s", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 func handleBet(w http.ResponseWriter, r *http.Request) {
