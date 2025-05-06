@@ -31,7 +31,7 @@ spec:
           valueFrom:
             secretKeyRef:
               key: MSSQL_DSN
-              name: horsebets
+              name: horsebets2
         ports:
         - containerPort: 8080
         livenessProbe:
