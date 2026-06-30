@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -15,11 +16,12 @@ import (
 	"gorm.io/gorm"
 )
 
-var db *gorm.DB
+var store Store
 
 // Models
 type Race struct {
-	ID        uint `gorm:"primaryKey"`
+	ID        uint   `gorm:"primaryKey"`
+	PublicID  string `gorm:"uniqueIndex"`
 	Name      string
 	CreatedAt time.Time
 	Locked    bool // lock betting when true
@@ -27,19 +29,24 @@ type Race struct {
 }
 
 type Horse struct {
-	ID     uint `gorm:"primaryKey"`
-	RaceID uint
-	Name   string
-	Amount float64
-	Bets   []Bet
+	ID           uint   `gorm:"primaryKey"`
+	PublicID     string `gorm:"uniqueIndex"`
+	RaceID       uint
+	RacePublicID string `gorm:"index"`
+	Name         string
+	Amount       float64
+	Bets         []Bet
 }
 
 type Bet struct {
-	ID        uint `gorm:"primaryKey"`
-	HorseID   uint
-	Name      string
-	Amount    float64
-	CreatedAt time.Time
+	ID            uint   `gorm:"primaryKey"`
+	PublicID      string `gorm:"uniqueIndex"`
+	HorseID       uint
+	HorsePublicID string `gorm:"index"`
+	RacePublicID  string `gorm:"index"`
+	Name          string
+	Amount        float64
+	CreatedAt     time.Time
 }
 
 // Data structure for odds calculation
@@ -67,23 +74,7 @@ var (
 
 func main() {
 	var err error
-	var data gorm.Dialector
-	if mssql_dsn, found := os.LookupEnv("MSSQL_DSN"); found {
-		log.Printf("using mssql %s", mssql_dsn)
-		data = sqlserver.Open(mssql_dsn)
-	} else {
-		sqllitefile := "bets.db"
-		log.Printf("using sqllite db file %s", sqllitefile)
-		data = sqlite.Open(sqllitefile)
-	}
-
-	db, err = gorm.Open(data, &gorm.Config{})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Auto-migrate schema
-	err = db.AutoMigrate(&Race{}, &Horse{}, &Bet{})
+	store, err = openStore()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -108,10 +99,46 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 
+func openStore() (Store, error) {
+	cosmos, usingCosmos, err := newCosmosStoreFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	if usingCosmos {
+		log.Print("using cosmos db")
+		return cosmos, nil
+	}
+
+	var data gorm.Dialector
+	if mssql_dsn, found := os.LookupEnv("MSSQL_DSN"); found {
+		log.Printf("using mssql %s", mssql_dsn)
+		data = sqlserver.Open(mssql_dsn)
+	} else {
+		sqllitefile := "bets.db"
+		log.Printf("using sqllite db file %s", sqllitefile)
+		data = sqlite.Open(sqllitefile)
+	}
+
+	db, err := gorm.Open(data, &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Auto-migrate schema
+	err = db.AutoMigrate(&Race{}, &Horse{}, &Bet{})
+	if err != nil {
+		return nil, err
+	}
+	return newGormStore(db), nil
+}
+
 // Show all races
 func handleHome(w http.ResponseWriter, r *http.Request) {
-	var races []Race
-	db.Order("created_at desc").Find(&races)
+	races, err := store.ListRaces()
+	if err != nil {
+		http.Error(w, "Could not load races", http.StatusInternalServerError)
+		return
+	}
 
 	indexTemplate.Execute(w, races)
 }
@@ -119,22 +146,23 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 // Show horses in a race + betting form
 func handleRace(w http.ResponseWriter, r *http.Request) {
 	raceIDStr := strings.TrimPrefix(r.URL.Path, "/race/")
-	raceID, err := strconv.Atoi(raceIDStr)
-	if err != nil {
-		http.Error(w, "Invalid race ID", 400)
-		return
-	}
 
 	// Load race to get locked state
-	var race Race
-	if err := db.First(&race, raceID).Error; err != nil {
+	race, err := store.GetRace(raceIDStr)
+	if errors.Is(err, errNotFound) {
 		http.Error(w, "Race not found", http.StatusNotFound)
 		return
 	}
-	locked := race.Locked
+	if err != nil {
+		http.Error(w, "Could not load race", http.StatusInternalServerError)
+		return
+	}
 
-	var horses []Horse
-	db.Where("race_id = ?", raceID).Find(&horses)
+	horses, err := store.HorsesForRace(raceIDStr)
+	if err != nil {
+		http.Error(w, "Could not load horses", http.StatusInternalServerError)
+		return
+	}
 
 	var total float64
 	for _, h := range horses {
@@ -154,24 +182,23 @@ func handleRace(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	var bettors []string
-	db.Model(&Bet{}).
-		Joins("join horses on bets.horse_id = horses.id").
-		Where("horses.race_id = ?", raceID).
-		Distinct("bets.name").
-		Pluck("bets.name", &bettors)
+	bettors, err := store.BettorsForRace(raceIDStr)
+	if err != nil {
+		http.Error(w, "Could not load bettors", http.StatusInternalServerError)
+		return
+	}
 
 	err = raceTemplate.Execute(w, struct {
 		Name    string
-		RaceID  int
+		RaceID  string
 		Horses  []HorseWithOdds
 		Locked  bool
 		Bettors []string
 	}{
 		Name:    race.Name,
-		RaceID:  raceID,
+		RaceID:  race.RouteID(),
 		Horses:  horsesWithOdds,
-		Locked:  locked,
+		Locked:  race.Locked,
 		Bettors: bettors,
 	})
 	if err != nil {
@@ -194,49 +221,31 @@ func handleBet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	raceID, err := strconv.Atoi(raceIDStr)
-	if err != nil {
-		http.Error(w, "Invalid race ID", 400)
-		return
-	}
-
-	// Check if betting is closed for this race
-	var race Race
-	if err := db.First(&race, raceID).Error; err != nil {
-		http.Error(w, "Race not found", http.StatusNotFound)
-		return
-	}
-	if race.Locked {
-		http.Error(w, "Betting closed for this race", http.StatusForbidden)
-		return
-	}
-
-	// Get all horses for this race
-	var horses []Horse
-	db.Where("race_id = ?", raceID).Find(&horses)
-
-	for _, horse := range horses {
-		amountStr := r.FormValue("amount_" + strconv.Itoa(int(horse.ID)))
+	amounts := map[string]float64{}
+	for key, values := range r.Form {
+		if !strings.HasPrefix(key, "amount_") || len(values) == 0 {
+			continue
+		}
+		amountStr := values[0]
 		if amountStr == "" {
 			continue
 		}
 
-		amount, err := strconv.ParseFloat(amountStr, 64)
+		amount, err := parseAmount(amountStr)
 		if err != nil || amount <= 0 {
 			continue
 		}
-
-		// Save individual Bet
-		bet := Bet{
-			HorseID: horse.ID,
-			Name:    bettorName,
-			Amount:  amount,
-		}
-		db.Create(&bet)
-
-		// Update total amount on horse
-		db.Model(&Horse{}).Where("id = ?", horse.ID).
-			UpdateColumn("amount", gorm.Expr("amount + ?", amount))
+		amounts[strings.TrimPrefix(key, "amount_")] = amount
+	}
+	if err := store.CreateBets(raceIDStr, bettorName, amounts); errors.Is(err, errRaceLocked) {
+		http.Error(w, "Betting closed for this race", http.StatusForbidden)
+		return
+	} else if errors.Is(err, errNotFound) {
+		http.Error(w, "Race not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Could not save bet", http.StatusInternalServerError)
+		return
 	}
 
 	time.Sleep(300 * time.Millisecond)
@@ -261,20 +270,18 @@ func handleCreateRace(w http.ResponseWriter, r *http.Request) {
 		}
 
 		horseList := strings.Split(horses, ",")
-		var horseObjs []Horse
+		var horseNames []string
 		for _, h := range horseList {
 			h = strings.TrimSpace(h)
 			if h != "" {
-				horseObjs = append(horseObjs, Horse{Name: h})
+				horseNames = append(horseNames, h)
 			}
 		}
 
-		race := Race{
-			Name:   name,
-			Horses: horseObjs,
+		if err := store.CreateRace(name, horseNames); err != nil {
+			http.Error(w, "Could not create race", http.StatusInternalServerError)
+			return
 		}
-
-		db.Create(&race)
 
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
@@ -283,22 +290,27 @@ func handleCreateRace(w http.ResponseWriter, r *http.Request) {
 // handleHorse shows bets for a specific horse and calculates equal share of pot
 func handleHorse(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimPrefix(r.URL.Path, "/horse/")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid horse ID", http.StatusBadRequest)
-		return
-	}
-	var horse Horse
-	if err := db.First(&horse, id).Error; err != nil {
+	horse, err := store.GetHorse(idStr)
+	if errors.Is(err, errNotFound) {
 		http.Error(w, "Horse not found", http.StatusNotFound)
 		return
 	}
+	if err != nil {
+		http.Error(w, "Could not load horse", http.StatusInternalServerError)
+		return
+	}
 	// Load bets for this horse
-	var bets []Bet
-	db.Where("horse_id = ?", id).Find(&bets)
+	bets, err := store.BetsForHorse(idStr)
+	if err != nil {
+		http.Error(w, "Could not load bets", http.StatusInternalServerError)
+		return
+	}
 	// Calculate race total pot
-	var raceHorses []Horse
-	db.Where("race_id = ?", horse.RaceID).Find(&raceHorses)
+	raceHorses, err := store.HorsesForRace(horse.RaceRouteID())
+	if err != nil {
+		http.Error(w, "Could not load race", http.StatusInternalServerError)
+		return
+	}
 	var raceTotal float64
 	for _, h := range raceHorses {
 		raceTotal += h.Amount
@@ -323,18 +335,19 @@ func handleHorse(w http.ResponseWriter, r *http.Request) {
 		Bets       []BetWithPayout
 		RaceTotal  float64
 		HorseTotal float64
-	}{Horse: horse, Bets: betPayouts, RaceTotal: raceTotal, HorseTotal: horse.Amount})
+	}{Horse: *horse, Bets: betPayouts, RaceTotal: raceTotal, HorseTotal: horse.Amount})
 }
 
 // handleStopRace locks betting on a race
 func handleStopRace(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/race/"), "/stop")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid race ID", http.StatusBadRequest)
+	if err := store.LockRace(idStr); errors.Is(err, errNotFound) {
+		http.Error(w, "Race not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Could not lock race", http.StatusInternalServerError)
 		return
 	}
-	db.Model(&Race{}).Where("id = ?", id).Update("Locked", true)
 	http.Redirect(w, r, "/race/"+idStr, http.StatusSeeOther)
 }
 
@@ -346,39 +359,18 @@ func handleBettor(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
-	raceID, err := strconv.Atoi(parts[0])
+	raceID := parts[0]
 	name := parts[1]
-	if err != nil {
-		http.Error(w, "Invalid race ID", http.StatusBadRequest)
+	bettorBets, err := store.BetsForBettor(raceID, name)
+	if errors.Is(err, errNotFound) {
+		http.Error(w, "Race not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Could not load bettor", http.StatusInternalServerError)
 		return
 	}
-	var horses []Horse
-	db.Where("race_id = ?", raceID).Find(&horses)
-	horseMap := make(map[uint]string)
-	var horseIDs []uint
-	for _, h := range horses {
-		horseIDs = append(horseIDs, h.ID)
-		horseMap[h.ID] = h.Name
-	}
-	var bets []Bet
-	db.Where("horse_id IN ?", horseIDs).
-		Where("name = ?", name).
-		Find(&bets)
-	type BettorBet struct {
-		HorseID   uint
-		HorseName string
-		Amount    float64
-	}
-	var bettorBets []BettorBet
-	for _, b := range bets {
-		bettorBets = append(bettorBets, BettorBet{
-			HorseID:   b.HorseID,
-			HorseName: horseMap[b.HorseID],
-			Amount:    b.Amount,
-		})
-	}
 	bettorTemplate.Execute(w, struct {
-		RaceID int
+		RaceID string
 		Name   string
 		Bets   []BettorBet
 	}{
@@ -390,15 +382,14 @@ func handleBettor(w http.ResponseWriter, r *http.Request) {
 
 // handleHealthz checks database connectivity and liveness/readiness
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
-	sqlDB, err := db.DB()
-	if err != nil {
-		http.Error(w, "Database connection error", http.StatusInternalServerError)
-		return
-	}
-	if err := sqlDB.Ping(); err != nil {
+	if err := store.Ready(); err != nil {
 		http.Error(w, "Database ping failed", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
+}
+
+func parseAmount(amount string) (float64, error) {
+	return strconv.ParseFloat(amount, 64)
 }
