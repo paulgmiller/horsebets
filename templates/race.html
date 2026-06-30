@@ -53,10 +53,10 @@
         <tbody>
           {{range .Horses}}
           <tr>
-            <td><a href="/horse/{{.ID}}">{{.Name}}</a></td>
+            <td><a href="/horse/{{.RouteID}}">{{.Name}}</a></td>
             <td>${{printf "%.2f" .Amount}}</td>
             <td>{{.FractionalOdds}}</td>
-            <td><input type="number" class="form-control" step="0.01" name="amount_{{.ID}}" min="0"></td>
+            <td><input type="number" class="form-control" step="0.01" name="amount_{{.RouteID}}" min="0"></td>
           </tr>
           {{end}}
         </tbody>
