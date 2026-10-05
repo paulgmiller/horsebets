@@ -27,11 +27,8 @@ spec:
         name: horsebets
         resources: {}
         env:
-        - name: MSSQL_DSN
-          valueFrom:
-            secretKeyRef:
-              key: MSSQL_DSN
-              name: horsebets2
+        - name: DATABASE_URL
+          value: postgresql://root@cockroachdb-public.cockroach.svc.cluster.local:26257/horsebets?sslmode=disable
         ports:
         - containerPort: 8080
         livenessProbe:

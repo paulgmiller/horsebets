@@ -5,13 +5,10 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"gorm.io/driver/sqlite"
-	"gorm.io/driver/sqlserver"
 	"gorm.io/gorm"
 )
 
@@ -67,23 +64,13 @@ var (
 
 func main() {
 	var err error
-	var data gorm.Dialector
-	if mssql_dsn, found := os.LookupEnv("MSSQL_DSN"); found {
-		log.Printf("using mssql %s", mssql_dsn)
-		data = sqlserver.Open(mssql_dsn)
-	} else {
-		sqllitefile := "bets.db"
-		log.Printf("using sqllite db file %s", sqllitefile)
-		data = sqlite.Open(sqllitefile)
-	}
-
-	db, err = gorm.Open(data, &gorm.Config{})
+	db, err = openDatabase()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Auto-migrate schema
-	err = db.AutoMigrate(&Race{}, &Horse{}, &Bet{})
+	err = migrateSchema(db)
 	if err != nil {
 		log.Fatal(err)
 	}
