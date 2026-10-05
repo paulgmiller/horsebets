@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -63,6 +64,12 @@ var (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "migrate-data" {
+		if err := runDataMigration(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	var err error
 	db, err = openDatabase()
 	if err != nil {
