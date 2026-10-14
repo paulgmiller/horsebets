@@ -23,12 +23,15 @@ spec:
         app: horsebets
     spec:
       containers:
-      - image: paulgmiller/horsebets:269dada
+      - image: paulgmiller/horsebets:2f3b9d0
         name: horsebets
         resources: {}
         env:
         - name: DATABASE_URL
-          value: postgresql://root@cockroachdb-public.cockroach.svc.cluster.local:26257/horsebets?sslmode=disable
+          valueFrom:
+            secretKeyRef:
+              name: cockroachdb-connection
+              key: DATABASE_URL
         ports:
         - containerPort: 8080
         livenessProbe:
