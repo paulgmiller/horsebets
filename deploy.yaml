@@ -23,15 +23,15 @@ spec:
         app: horsebets
     spec:
       containers:
-      - image: paulgmiller/horsebets:2f3b9d0
+      - image: paulgmiller/horsebets:269dada
         name: horsebets
         resources: {}
         env:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: cockroachdb-connection
-              key: DATABASE_URL
+              name: roachmotel-credentials
+              key: connection-string
         ports:
         - containerPort: 8080
         livenessProbe:
