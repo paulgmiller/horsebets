@@ -30,8 +30,8 @@ spec:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: roachmotel-credentials
-              key: connection-string
+              name: roachkey
+              key: DATABASE_URL
         ports:
         - containerPort: 8080
         livenessProbe:
